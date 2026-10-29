@@ -1,67 +1,131 @@
 import "./App.css";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 
+interface Message {
+  id: string;
+  sender: "user" | "bot";
+  text: string;
+}
+
 function App() {
-  const [response, setResponse] = useState<string>("");
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "1",
+      sender: "bot",
+      text: "👋 Hi there! How can I assist you today?",
+    },
+  ]);
   const [value, setValue] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value);
-  };
+  // Auto scroll to bottom on new message
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   const handleSubmit = async () => {
-    if (!value) return;
+    if (!value.trim() || loading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      sender: "user",
+      text: value.trim(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setValue("");
     setLoading(true);
-    setResponse("");
+
     try {
       const res = await axios.post("/api/chatbot", {
-        question: value,
+        question: userMessage.text,
       });
-      setResponse(res.data);
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        sender: "bot",
+        text: res.data,
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
-      console.error("API Error:", err);
-      setResponse("⚠️ Error fetching response from backend.");
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: "bot",
+          text: "⚠️ Sorry, something went wrong fetching the response.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container">
-      <h2>🤖 AI Chatbot</h2>
+    <div className="chat-app">
+      {/* Header */}
+      <header className="chat-header">
+        <div className="bot-avatar">🤖</div>
+        <div>
+          <h2>AI Assistant</h2>
+          <span className="status">● Online</span>
+        </div>
+      </header>
 
-      <div className="input-section">
-        <input
-          type="text"
-          value={value}
-          onChange={onChange}
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          disabled={loading}
-          placeholder="Type your question here..."
-        />
-        <button onClick={handleSubmit} disabled={loading || !value}>
-          {loading ? "Thinking..." : "Ask AI"}
-        </button>
+      {/* Messages Feed */}
+      <div className="chat-feed">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`message-row ${msg.sender}`}>
+            <div className="avatar">
+              {msg.sender === "bot" ? "🤖" : "👤"}
+            </div>
+            <div className="bubble">
+              {msg.sender === "bot" ? (
+                <ReactMarkdown>{msg.text}</ReactMarkdown>
+              ) : (
+                <p>{msg.text}</p>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div className="message-row bot">
+            <div className="avatar">🤖</div>
+            <div className="bubble typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        )}
+        <div ref={chatEndRef} />
       </div>
 
-      <div className="response-box">
-        {loading ? (
-          <p className="loading">⏳ Please wait, fetching response...</p>
-        ) : (
-          <>
-            <h3>💬 Chatbot Response:</h3>
-            {response ? (
-              <div className="markdown-content">
-                <ReactMarkdown>{response}</ReactMarkdown>
-              </div>
-            ) : (
-              <p className="bot-prompt">Hii there! How can I assist you?</p>
-            )}
-          </>
-        )}
+      {/* Input Section */}
+      <div className="chat-input-container">
+        <div className="input-wrapper">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            disabled={loading}
+            placeholder="Ask anything..."
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !value.trim()}
+            className="send-btn"
+          >
+            ➔
+          </button>
+        </div>
       </div>
     </div>
   );
