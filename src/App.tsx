@@ -1,10 +1,10 @@
 import "./App.css";
 import { useState } from "react";
 import axios from "axios";
+import ReactMarkdown from "react-markdown";
 
 function App() {
   const [response, setResponse] = useState<string>("");
-
   const [value, setValue] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -17,40 +17,16 @@ function App() {
     setLoading(true);
     setResponse("");
     try {
-      const res = await axios.post("http://localhost:5000/chatbot", {
+      const res = await axios.post("/api/chatbot", {
         question: value,
       });
       setResponse(res.data);
     } catch (err) {
-      console.error(err);
+      console.error("API Error:", err);
       setResponse("⚠️ Error fetching response from backend.");
     } finally {
       setLoading(false);
     }
-  };
-
-  // ✅ Function to format markdown-like text manually
-  const formatResponse = (text: string): string => {
-    if (!text) return "";
-
-    // Replace **bold**
-    let formatted = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-    // Replace *italic*
-    formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-    // Replace - lists
-    formatted = formatted.replace(/^- (.*)$/gm, "<li>$1</li>");
-
-    // Wrap lists with <ul> tags (only if <li> exists)
-    if (formatted.includes("<li>")) {
-      formatted = formatted.replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>");
-    }
-
-    // Replace newlines with <br/>
-    formatted = formatted.replace(/\n/g, "<br/>");
-
-    return formatted;
   };
 
   return (
@@ -62,6 +38,7 @@ function App() {
           type="text"
           value={value}
           onChange={onChange}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           disabled={loading}
           placeholder="Type your question here..."
         />
@@ -76,11 +53,13 @@ function App() {
         ) : (
           <>
             <h3>💬 Chatbot Response:</h3>
-            {/* ✅ Render formatted HTML safely */}
-            <p
-              dangerouslySetInnerHTML={{ __html: formatResponse(response) }}
-            ></p>
-            <p className="bot-prompt">Hii there! How can I assist you?</p>
+            {response ? (
+              <div className="markdown-content">
+                <ReactMarkdown>{response}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="bot-prompt">Hii there! How can I assist you?</p>
+            )}
           </>
         )}
       </div>
